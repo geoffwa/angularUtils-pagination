@@ -37,25 +37,33 @@
         return  {
             terminal: true,
             compile: function(element, attrs){
-                attrs.$set('ngRepeat', attrs.dirPaginate); // Add ng-repeat to the dom element
+                var expression = attrs.dirPaginate;
                 element.removeAttr(attrs.$attr.dirPaginate); // Remove the dir-paginate attribute to prevent infinite recursion of compilation
 
-                var expression = attrs.dirPaginate;
                 // regex taken directly from https://github.com/angular/angular.js/blob/master/src/ng/directive/ngRepeat.js#L211
                 var match = expression.match(/^\s*([\s\S]+?)\s+in\s+([\s\S]+?)(?:\s+track\s+by\s+([\s\S]+?))?\s*$/);
 
                 var filterPattern = /\|\s*itemsPerPage\s*:[^|]*/;
-                if (match[2].match(filterPattern) === null) {
-                    throw 'pagination directive: the \'itemsPerPage\' filter must be set.';
-                }
+                var haveItemsPerPageFilter = !!match[2].match(filterPattern);
                 var itemsPerPageFilterRemoved = match[2].replace(filterPattern, '');
                 var collectionGetter = $parse(itemsPerPageFilterRemoved);
 
                 return function(scope, element, attrs){
-                    var paginationId;
-                    var compiled =  $compile(element); // we manually compile the element again, as we have now swapped dir-paginate for an ng-repeat
+                    var paginationId = attrs.paginationId || '__default';
+                    var itemsPerPage = attrs.itemsPerPage;
 
-                    paginationId = attrs.paginationId || '__default';
+                    if (haveItemsPerPageFilter) {
+                      attrs.$set('ngRepeat', expression);
+                    } else {
+                      if (typeof(itemsPerPage) === 'undefined') {
+                        throw 'pagination directive: the \'itemsPerPage\' filter or \'items-per-page\' attribute must be set.';
+                      }
+
+                      var filterExpression = 'itemsPerPage: ' + itemsPerPage + ": '" + paginationId + "'";
+                      attrs.$set('ngRepeat', expression + ' | ' + filterExpression);
+                    }
+
+                    var compiled = $compile(element); // we manually compile the element again, as we have now swapped dir-paginate for an ng-repeat
                     paginationService.registerInstance(paginationId);
 
                     var currentPageGetter;
